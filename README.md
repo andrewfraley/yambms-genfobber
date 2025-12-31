@@ -15,7 +15,33 @@ This module provides RF-based generator control via a CC1101 transceiver for Yam
 
 ## Usage as YamBMS Remote Package
 
-Include this module in your YamBMS configuration as a remote package:
+Include this module in your YamBMS configuration as a remote package. All settings can be customized using the `vars:` parameter:
+
+```yaml
+packages:
+  generator_control:
+    url: https://github.com/yourusername/yambms-genfobber
+    file: yambms_genfobber.yaml
+    ref: main
+    # All settings are optional - defaults shown below
+    vars:
+      # CC1101 Pin Configuration
+      sck_pin: "18"           # SPI Clock
+      miso_pin: "19"          # SPI MISO
+      mosi_pin: "23"          # SPI MOSI
+      csn_pin: "5"            # Chip Select
+      gdo0_pin: "2"           # CC1101 GDO0 Data I/O
+      dry_contact_pin: "15"   # Dry contact input
+      # RF Transmission Settings
+      tx_frequency: "433.89"  # TX frequency in MHz
+      # Generator RF Codes (replace with your captured codes)
+      generator_start_code: '[your, start, codes, here]'
+      generator_stop_code: '[your, stop, codes, here]'
+```
+
+## Configuration Examples
+
+### Minimal Configuration (using all defaults)
 
 ```yaml
 packages:
@@ -25,62 +51,35 @@ packages:
     ref: main
 ```
 
-## Configuration
-
-### Pin Override Example
+### Custom Pin Configuration
 
 ```yaml
-# Override default pins before including the package
-globals:
-  - id: sck_pin
-    type: int
-    initial_value: '18'
-  - id: miso_pin
-    type: int
-    initial_value: '19'
-  - id: mosi_pin
-    type: int
-    initial_value: '23'
-  - id: csn_pin
-    type: int
-    initial_value: '5'
-  - id: gdo0_pin
-    type: int
-    initial_value: '2'
-  - id: dry_contact_pin
-    type: int
-    initial_value: '15'
-
 packages:
   generator_control:
     url: https://github.com/yourusername/yambms-genfobber
     file: yambms_genfobber.yaml
     ref: main
+    vars:
+      sck_pin: "14"
+      miso_pin: "12"
+      mosi_pin: "13"
+      csn_pin: "15"
+      gdo0_pin: "4"
+      dry_contact_pin: "16"
 ```
 
-### RF Code and Frequency Override Example
-
-To use your own RF codes and adjust the TX frequency:
+### Custom RF Codes and Frequency
 
 ```yaml
-globals:
-  - id: generator_start_code
-    type: std::vector<int>
-    initial_value: '[your, captured, raw, codes, here]'
-  - id: generator_stop_code
-    type: std::vector<int>
-    initial_value: '[your, captured, raw, codes, here]'
-
 packages:
   generator_control:
     url: https://github.com/yourusername/yambms-genfobber
     file: yambms_genfobber.yaml
     ref: main
-
-# Override TX frequency after including the package
-number:
-  - id: tx_frequency
-    initial_value: 433.92  # Adjust to your frequency
+    vars:
+      tx_frequency: "433.92"
+      generator_start_code: '[339, -1161, 1071, -413, 1062, -423, 321, ...]'
+      generator_stop_code: '[330, -1143, 1064, -419, 1075, -413, 337, ...]'
 ```
 
 ## Home Assistant Controls
@@ -101,9 +100,21 @@ To capture your generator remote's RF codes:
 2. Monitor the ESPHome logs
 3. Press your generator remote's start button
 4. Copy the raw codes from the logs (look for `remote_receiver` output)
-5. Update the `generator_start_code` global in your YAML with the captured codes
+5. Update the `generator_start_code` in the `vars:` section of your YAML with the captured codes
 6. Repeat for the stop button
 7. Disable listen mode when done
+8. Recompile and upload your firmware
+
+Example of captured codes in logs:
+```
+[remote.raw:059]: Received Raw: [339, -1161, 1071, -413, 1062, ...]
+```
+
+Copy the entire array including brackets and add to your vars:
+```yaml
+vars:
+  generator_start_code: '[339, -1161, 1071, -413, 1062, ...]'
+```
 
 ## Hardware Connections
 
