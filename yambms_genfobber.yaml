@@ -1,0 +1,173 @@
+# CC1101 Fobber Component - YamBMS Remote Package Module
+# This module sends RF commands to control a generator via CC1101 transceiver
+# Include this file in your main ESPHome configuration
+# Override pins and RF codes using vars: when including this package
+
+# Configuration defaults - override via vars: in parent file
+substitutions:
+  # CC1101 Pin Configuration
+  sck_pin: "18"           # SPI Clock
+  miso_pin: "19"          # SPI MISO
+  mosi_pin: "23"          # SPI MOSI
+  csn_pin: "5"            # Chip Select
+  gdo0_pin: "2"           # CC1101 GDO0 Data I/O
+  dry_contact_pin: "15"   # Dry contact input
+  # RF Transmission Settings
+  tx_frequency: "433.89"  # TX frequency in MHz
+  # Generator control RF codes - replace with your captured codes
+  generator_start_code: '[339, -1161, 1071, -413, 1062, -423, 321, -1159, 330, -1144, 1064, -419, 324, -1171, 1064, -419, 1073, -413, 1062, -422, 319, -1163, 1055, -414, 1085, -419, 1068, -409, 336, -1145, 323, -1161, 1074, -413, 338, -1146, 319, -1165, 329, -1145, 337, -1158, 318, -1166, 335, -1146, 1073, -422, 327]'
+  generator_stop_code: '[330, -1143, 1064, -419, 1075, -413, 337, -1150, 319, -1163, 1056, -433, 312, -1178, 1069, -408, 1061, -414, 1080, -417, 321, -1151, 1065, -421, 1067, -404, 1085, -406, 340, -1158, 321, -1150, 1061, -421, 319, -1165, 330, -1170, 302, -1182, 321, -1151, 334, -1146, 1067, -432, 334, -1146, 324]'
+
+# Required includes and libraries
+includes:
+  - cc1101.h
+
+libraries:
+  - SPI
+  - SmartRC-CC1101-Driver-Lib
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/robertklep/esphome-custom-component
+    components:
+      - "custom"
+      - "custom_component"
+
+# Internal globals for RF codes (populated from substitutions)
+globals:
+  - id: generator_start_code
+    type: std::vector<int>
+    initial_value: '${generator_start_code}'
+  - id: generator_stop_code
+    type: std::vector<int>
+    initial_value: '${generator_stop_code}'
+
+sensor:
+  - platform: custom
+    sensors:
+      - id: transceiver
+        internal: true
+    lambda: |-
+      auto my_sensor = new CC1101(
+        ${sck_pin},   // SCK
+        ${miso_pin},  // MISO
+        ${mosi_pin},  // MOSI
+        ${csn_pin},   // CSN
+        ${gdo0_pin},  // GDO0
+        200,  // bandwidth_khz
+        ${tx_frequency}, // frequency_mhz
+        id(transmitter)
+      );
+      App.register_component(my_sensor);
+      return {my_sensor};
+
+remote_transmitter:
+  - id: transmitter
+    pin:
+      number: ${gdo0_pin}
+      allow_other_uses: true
+    carrier_duty_percent: 100%
+
+remote_receiver:
+  - id: receiver
+    pin:
+      number: ${gdo0_pin}
+      allow_other_uses: true
+    dump:
+      - raw
+
+# TX frequency configuration
+number:
+  - platform: template
+    id: tx_frequency_number
+    internal: true
+    unit_of_measurement: "MHz"
+    min_value: 430.000
+    max_value: 440.000
+    step: 0.001
+    optimistic: true
+    initial_value: ${tx_frequency}
+    on_value:
+      - lambda: |-
+          get_cc1101(transceiver).setFreq(x);
+
+# Reusable transmission scripts
+script:
+  - id: transmit_generator_start
+    mode: single
+    then:
+      - switch.turn_off: receive_mode
+      - lambda: |-
+          get_cc1101(transceiver).setFreq(id(tx_frequency_number).state);
+          get_cc1101(transceiver).beginTransmission();
+      - remote_transmitter.transmit_raw:
+          code: !lambda "return id(generator_start_code);"
+          repeat:
+            times: 3
+            wait_time: 15ms
+
+  - id: transmit_generator_stop
+    mode: single
+    then:
+      - switch.turn_off: receive_mode
+      - lambda: |-
+          get_cc1101(transceiver).setFreq(id(tx_frequency_number).state);
+          get_cc1101(transceiver).beginTransmission();
+      - remote_transmitter.transmit_raw:
+          code: !lambda "return id(generator_stop_code);"
+          repeat:
+            times: 3
+            wait_time: 15ms
+
+# Listen mode toggle - exposed to Home Assistant
+switch:
+  - platform: template
+    name: "Generator RF Listen Mode"
+    id: receive_mode
+    icon: mdi:radio-tower
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          get_cc1101(transceiver).endTransmission();
+    turn_off_action:
+      - lambda: |-
+          // Ensure correct TX frequency
+          get_cc1101(transceiver).setFreq(id(tx_frequency_number).state);
+      - lambda: |-
+          get_cc1101(transceiver).beginTransmission();
+
+# Dry contact input for generator control
+# When contact closes: send generator start command
+# When contact opens: send generator stop command
+binary_sensor:
+  - platform: gpio
+    id: generator_control_contact
+    internal: true
+    pin:
+      number: ${dry_contact_pin}
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      - script.execute: transmit_generator_start
+    on_release:
+      - script.execute: transmit_generator_stop
+
+# Manual control buttons - exposed to Home Assistant
+button:
+  - platform: template
+    name: "Generator Start"
+    id: manual_generator_start
+    icon: mdi:play-circle-outline
+    on_press:
+      - script.execute: transmit_generator_start
+
+  - platform: template
+    name: "Generator Stop"
+    id: manual_generator_stop
+    icon: mdi:stop-circle-outline
+    on_press:
+      - script.execute: transmit_generator_stop
