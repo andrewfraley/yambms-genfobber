@@ -19,20 +19,35 @@ substitutions:
   generator_stop_code: '[330, -1143, 1064, -419, 1075, -413, 337, -1150, 319, -1163, 1056, -433, 312, -1178, 1069, -408, 1061, -414, 1080, -417, 321, -1151, 1065, -421, 1067, -404, 1085, -406, 340, -1158, 321, -1150, 1061, -421, 319, -1165, 330, -1170, 302, -1182, 321, -1151, 334, -1146, 1067, -432, 334, -1146, 324]'
 
 # Required includes and libraries
-includes:
-  - cc1101.h
+# Note: include paths are resolved relative to the ESPHome project root
+# where esphome is executed (typically yambms-final/), not relative to this YAML file
+# Since this YAML is in ../yambms-genfobber/ relative to the project root,
+# and cc1101.h is in the same directory as this YAML, use:
+esphome:
+  includes:
+    - cc1101.h
+  libraries:
+    - SPI
+    - "SmartRC-CC1101-Driver-Lib"
+  on_boot:
+    priority: 100
+    then:
+      - lambda: |-
+          // Create and register CC1101 transceiver
+          auto *cc1101 = new CC1101(
+            ${sck_pin},   // SCK
+            ${miso_pin},  // MISO
+            ${mosi_pin},  // MOSI
+            ${csn_pin},   // CSN
+            ${gdo0_pin},  // GDO0
+            200,  // bandwidth_khz
+            ${tx_frequency}, // frequency_mhz
+            id(transmitter)
+          );
+          App.register_component(cc1101);
+          id(cc1101_transceiver) = cc1101;
 
-libraries:
-  - SPI
-  - SmartRC-CC1101-Driver-Lib
 
-external_components:
-  - source:
-      type: git
-      url: https://github.com/robertklep/esphome-custom-component
-    components:
-      - "custom"
-      - "custom_component"
 
 # Internal globals for RF codes (populated from substitutions)
 globals:
@@ -42,25 +57,11 @@ globals:
   - id: generator_stop_code
     type: std::vector<int>
     initial_value: '${generator_stop_code}'
+  - id: cc1101_transceiver
+    type: CC1101*
+    initial_value: 'nullptr'
+    restore_value: no
 
-sensor:
-  - platform: custom
-    sensors:
-      - id: transceiver
-        internal: true
-    lambda: |-
-      auto my_sensor = new CC1101(
-        ${sck_pin},   // SCK
-        ${miso_pin},  // MISO
-        ${mosi_pin},  // MOSI
-        ${csn_pin},   // CSN
-        ${gdo0_pin},  // GDO0
-        200,  // bandwidth_khz
-        ${tx_frequency}, // frequency_mhz
-        id(transmitter)
-      );
-      App.register_component(my_sensor);
-      return {my_sensor};
 
 remote_transmitter:
   - id: transmitter
@@ -90,7 +91,9 @@ number:
     initial_value: ${tx_frequency}
     on_value:
       - lambda: |-
-          get_cc1101(transceiver).setFreq(x);
+          if (id(cc1101_transceiver) != nullptr) {
+            get_cc1101(cc1101_transceiver).setFreq(x);
+          }
 
 # Reusable transmission scripts
 script:
@@ -99,8 +102,10 @@ script:
     then:
       - switch.turn_off: receive_mode
       - lambda: |-
-          get_cc1101(transceiver).setFreq(id(tx_frequency_number).state);
-          get_cc1101(transceiver).beginTransmission();
+          if (id(cc1101_transceiver) != nullptr) {
+            get_cc1101(cc1101_transceiver).setFreq(id(tx_frequency_number).state);
+            get_cc1101(cc1101_transceiver).beginTransmission();
+          }
       - remote_transmitter.transmit_raw:
           code: !lambda "return id(generator_start_code);"
           repeat:
@@ -112,8 +117,10 @@ script:
     then:
       - switch.turn_off: receive_mode
       - lambda: |-
-          get_cc1101(transceiver).setFreq(id(tx_frequency_number).state);
-          get_cc1101(transceiver).beginTransmission();
+          if (id(cc1101_transceiver) != nullptr) {
+            get_cc1101(cc1101_transceiver).setFreq(id(tx_frequency_number).state);
+            get_cc1101(cc1101_transceiver).beginTransmission();
+          }
       - remote_transmitter.transmit_raw:
           code: !lambda "return id(generator_stop_code);"
           repeat:
@@ -129,13 +136,19 @@ switch:
     optimistic: true
     turn_on_action:
       - lambda: |-
-          get_cc1101(transceiver).endTransmission();
+          if (id(cc1101_transceiver) != nullptr) {
+            get_cc1101(cc1101_transceiver).endTransmission();
+          }
     turn_off_action:
       - lambda: |-
           // Ensure correct TX frequency
-          get_cc1101(transceiver).setFreq(id(tx_frequency_number).state);
+          if (id(cc1101_transceiver) != nullptr) {
+            get_cc1101(cc1101_transceiver).setFreq(id(tx_frequency_number).state);
+          }
       - lambda: |-
-          get_cc1101(transceiver).beginTransmission();
+          if (id(cc1101_transceiver) != nullptr) {
+            get_cc1101(cc1101_transceiver).beginTransmission();
+          }
 
 # Dry contact input for generator control
 # When contact closes: send generator start command
