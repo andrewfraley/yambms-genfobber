@@ -19,8 +19,11 @@ substitutions:
   generator_stop_code: '[330, -1143, 1064, -419, 1075, -413, 337, -1150, 319, -1163, 1056, -433, 312, -1178, 1069, -408, 1061, -414, 1080, -417, 321, -1151, 1065, -421, 1067, -404, 1085, -406, 340, -1158, 321, -1150, 1061, -421, 319, -1165, 330, -1170, 302, -1182, 321, -1151, 334, -1146, 1067, -432, 334, -1146, 324]'
 
 # Required includes and libraries
-# For remote package use: C++ code embedded directly in lambda to avoid external file dependency
+# For remote package use: C++ code embedded directly to avoid external file dependency
 esphome:
+  includes:
+    - ELECHOUSE_CC1101_SRC_DRV.h
+    - esphome/components/remote_transmitter/remote_transmitter.h
   libraries:
     - SPI
     - "SmartRC-CC1101-Driver-Lib"
@@ -30,9 +33,6 @@ esphome:
       - lambda: |-
           // https://github.com/dbuezas/esphome-cc1101
           // CC1101 class definition - embedded for remote package compatibility
-          #include <ELECHOUSE_CC1101_SRC_DRV.h>
-          #include "esphome/components/remote_transmitter/remote_transmitter.h"
-
           #ifndef CC1101TRANSCIVER_H
           #define CC1101TRANSCIVER_H
 
