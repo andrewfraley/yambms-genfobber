@@ -19,11 +19,12 @@ substitutions:
   generator_stop_code: '[330, -1143, 1064, -419, 1075, -413, 337, -1150, 319, -1163, 1056, -433, 312, -1178, 1069, -408, 1061, -414, 1080, -417, 321, -1151, 1065, -421, 1067, -404, 1085, -406, 340, -1158, 321, -1150, 1061, -421, 319, -1165, 330, -1170, 302, -1182, 321, -1151, 334, -1146, 1067, -432, 334, -1146, 324]'
 
 # Required includes and libraries
-# For remote package use: C++ code embedded directly to avoid external file dependency
+# IMPORTANT: When using this as a remote package from GitHub, you must also
+# download cc1101.h from the same repo and place it in your ESPHome project directory.
+# Download from: https://github.com/andrewfraley/yambms-genfobber/raw/main/cc1101.h
 esphome:
   includes:
-    - ELECHOUSE_CC1101_SRC_DRV.h
-    - esphome/components/remote_transmitter/remote_transmitter.h
+    - cc1101.h
   libraries:
     - SPI
     - "SmartRC-CC1101-Driver-Lib"
@@ -31,96 +32,6 @@ esphome:
     priority: 600  # Run early, before most other components
     then:
       - lambda: |-
-          // https://github.com/dbuezas/esphome-cc1101
-          // CC1101 class definition - embedded for remote package compatibility
-          #ifndef CC1101TRANSCIVER_H
-          #define CC1101TRANSCIVER_H
-
-          static int CC1101_module_count = 0;
-          #define get_cc1101(id) (*((CC1101*)id))
-
-          class CC1101 : public PollingComponent, public Sensor {
-            int _SCK;
-            int _MISO;
-            int _MOSI;
-            int _CSN;
-            int _GDO0;  // TX and also RX
-            float _bandwidth;
-            esphome::remote_transmitter::RemoteTransmitterComponent* _remote_transmitter;
-            float _moduleNumber;
-            int _last_rssi = 0;
-
-            void setup() override {
-              pinMode(_GDO0, INPUT);
-              ELECHOUSE_cc1101.addSpiPin(_SCK, _MISO, _MOSI, _CSN, _moduleNumber);
-              ELECHOUSE_cc1101.setModul(_moduleNumber);
-              ELECHOUSE_cc1101.Init();
-              ELECHOUSE_cc1101.setRxBW(_bandwidth);
-              ELECHOUSE_cc1101.setMHZ(_freq);
-              ELECHOUSE_cc1101.SetRx();
-            }
-
-           public:
-            float _freq;
-            CC1101(int SCK, int MISO, int MOSI, int CSN, int GDO0, float bandwidth, float freq,
-                   esphome::remote_transmitter::RemoteTransmitterComponent* remote_transmitter)
-                : PollingComponent(100) {
-              _SCK = SCK;
-              _MISO = MISO;
-              _MOSI = MOSI;
-              _CSN = CSN;
-              _GDO0 = GDO0;
-              _bandwidth = bandwidth;
-              _freq = freq;
-              _moduleNumber = CC1101_module_count++;
-              _remote_transmitter = remote_transmitter;
-            }
-
-            void beginTransmission() {
-              ELECHOUSE_cc1101.setModul(_moduleNumber);
-              ELECHOUSE_cc1101.SetTx();
-              pinMode(_GDO0, OUTPUT);
-          #ifdef USE_ESP32
-              _remote_transmitter->setup();
-          #endif
-          #ifdef USE_ESP8266
-              noInterrupts();
-          #endif
-            }
-            void endTransmission() {
-              digitalWrite(_GDO0, 0);
-              pinMode(_GDO0, INPUT);
-          #ifdef USE_ESP8266
-              interrupts();
-          #endif
-              ELECHOUSE_cc1101.setModul(_moduleNumber);
-              ELECHOUSE_cc1101.SetRx();
-              ELECHOUSE_cc1101.SetRx();  // yes, twice
-            }
-            void setBW(float bandwidth) {
-              ELECHOUSE_cc1101.setModul(_moduleNumber);
-              ELECHOUSE_cc1101.setRxBW(bandwidth);
-            }
-            void setFreq(float freq) {
-              ELECHOUSE_cc1101.setModul(_moduleNumber);
-              ELECHOUSE_cc1101.setMHZ(freq);
-            }
-            bool rssi_on = false;
-            void update() override {
-              int rssi = 0;
-              if (rssi_on) {
-                ELECHOUSE_cc1101.setModul(_moduleNumber);
-                rssi = ELECHOUSE_cc1101.getRssi();
-                if (rssi != _last_rssi) {
-                  publish_state(rssi);
-                  _last_rssi = rssi;
-                }
-              }
-            }
-          };
-
-          #endif
-
           // Create and register CC1101 transceiver
           auto *cc1101 = new CC1101(
             ${sck_pin},   // SCK
@@ -128,6 +39,13 @@ esphome:
             ${mosi_pin},  // MOSI
             ${csn_pin},   // CSN
             ${gdo0_pin},  // GDO0
+            200,  // bandwidth_khz
+            ${tx_frequency}, // frequency_mhz
+            id(transmitter)
+          );
+          App.register_component(cc1101);
+          id(cc1101_transceiver) = cc1101;
+
             200,  // bandwidth_khz
             ${tx_frequency}, // frequency_mhz
             id(transmitter)
