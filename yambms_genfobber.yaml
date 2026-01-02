@@ -17,11 +17,11 @@ substitutions:
   dry_contact_pin: "38"  # IO38 - Safe
   dry_contact_inverted: "true"  # Set to false if button logic is inverted
 
-  # Button 1 Transmission Code (raw format)
-  button1_code: "339, -1161, 1071, -413, 1062, -423, 321, -1159, 330, -1144, 1064, -419, 324, -1171, 1064, -419, 1073, -413, 1062, -422, 319, -1163, 1055, -414, 1085, -419, 1068, -409, 336, -1145, 323, -1161, 1074, -413, 338, -1146, 319, -1165, 329, -1145, 337, -1158, 318, -1166, 335, -1146, 1073, -422, 327"
+  # Start Generator Transmission Code (raw format)
+  start_generator_code: "339, -1161, 1071, -413, 1062, -423, 321, -1159, 330, -1144, 1064, -419, 324, -1171, 1064, -419, 1073, -413, 1062, -422, 319, -1163, 1055, -414, 1085, -419, 1068, -409, 336, -1145, 323, -1161, 1074, -413, 338, -1146, 319, -1165, 329, -1145, 337, -1158, 318, -1166, 335, -1146, 1073, -422, 327"
 
-  # Button 2 Transmission Code (raw format)
-  button2_code: "330, -1143, 1064, -419, 1075, -413, 337, -1150, 319, -1163, 1056, -433, 312, -1178, 1069, -408, 1061, -414, 1080, -417, 321, -1151, 1065, -421, 1067, -404, 1085, -406, 340, -1158, 321, -1150, 1061, -421, 319, -1165, 330, -1170, 302, -1182, 321, -1151, 334, -1146, 1067, -432, 334, -1146, 324"
+  # Stop Generator Transmission Code (raw format)
+  stop_generator_code: "330, -1143, 1064, -419, 1075, -413, 337, -1150, 319, -1163, 1056, -433, 312, -1178, 1069, -408, 1061, -414, 1080, -417, 321, -1151, 1065, -421, 1067, -404, 1085, -406, 340, -1158, 321, -1150, 1061, -421, 319, -1165, 330, -1170, 302, -1182, 321, -1151, 334, -1146, 1067, -432, 334, -1146, 324"
 
   # Transmission Settings
   tx_repeat_times: "3"
@@ -91,38 +91,38 @@ binary_sensor:
       - delayed_on: 50ms
       - delayed_off: 50ms
     on_press:
-      - logger.log: "Physical button pressed - triggering button 1"
-      - button.press: cc1101_transmit_button_1
+      - logger.log: "Physical button pressed - triggering start generator"
+      - button.press: cc1101_start_generator
     on_release:
-      - logger.log: "Physical button released - triggering button 2"
-      - button.press: cc1101_transmit_button_2
+      - logger.log: "Physical button released - triggering stop generator"
+      - button.press: cc1101_stop_generator
 
 # Transmit buttons
 button:
   - platform: template
-    name: "${friendly_name} Transmit Button 1"
-    id: cc1101_transmit_button_1
-    icon: mdi:alpha-1-circle-outline
+    name: "${friendly_name} Start Generator"
+    id: cc1101_start_generator
+    icon: mdi:power
     on_press:
-      - logger.log: "Button 1: Starting transmission"
+      - logger.log: "Start Generator: Starting transmission"
       - remote_transmitter.transmit_raw:
           code: !lambda |-
-            return {${button1_code}};
+            return {${start_generator_code}};
           repeat:
             times: ${tx_repeat_times}
             wait_time: ${tx_repeat_wait}
-      - logger.log: "Button 1: Transmission complete"
+      - logger.log: "Start Generator: Transmission complete"
 
   - platform: template
-    name: "${friendly_name} Transmit Button 2"
-    id: cc1101_transmit_button_2
-    icon: mdi:alpha-2-circle-outline
+    name: "${friendly_name} Stop Generator"
+    id: cc1101_stop_generator
+    icon: mdi:power-off
     on_press:
-      - logger.log: "Button 2: Starting transmission"
+      - logger.log: "Stop Generator: Starting transmission"
       - remote_transmitter.transmit_raw:
           code: !lambda |-
-            return {${button2_code}};
+            return {${stop_generator_code}};
           repeat:
             times: ${tx_repeat_times}
             wait_time: ${tx_repeat_wait}
-      - logger.log: "Button 2: Transmission complete"
+      - logger.log: "Stop Generator: Transmission complete"

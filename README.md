@@ -1,131 +1,143 @@
-# CC1101 Generator Control Module for YamBMS
+# CC1101 RF Remote Control Template for ESPHome
 
 ## Overview
 
-This module provides RF-based generator control via a CC1101 transceiver for YamBMS systems. It can be used as a remote package to send start/stop commands to a generator controller via learned RF codes.
+This is a reusable ESPHome template for CC1101 RF transceiver modules. It provides a complete RF remote control system with transmission, reception, and configurable button codes. Perfect for controlling garage doors, gates, or other RF-controlled devices.
 
 ## Features
 
-- **Automatic Control**: Dry contact input triggers generator start (contact closes) and stop (contact opens)
-- **Manual Control**: Home Assistant buttons to manually send start/stop commands
-- **Listen Mode**: Toggle RF receive mode to capture codes from your existing remote
-- **Configurable RF Codes**: Override the default RF codes with your own learned codes
-- **Frequency Adjustment**: Set TX frequency via YAML (430-440 MHz, default 433.89 MHz)
-- **Pin Configuration**: Fully configurable pin assignments
+- **Dual RF Buttons**: Two independently configurable RF transmission codes
+- **Dry Contact Input**: Physical button input triggers RF transmissions
+- **Listen Mode**: Built-in RF receiver to capture codes from existing remotes
+- **Manual Control**: Home Assistant buttons for testing and manual operation
+- **Frequency Configuration**: Set frequency in Hz (300-928 MHz depending on CC1101 model)
+- **Full Pin Configuration**: All pins are configurable via substitutions
 
-## Usage as YamBMS Remote Package
+## Hardware Requirements
 
-Include this module in your YamBMS configuration as a remote package. All settings can be customized using the `vars:` parameter:
+- ESP32 or ESP8266 board
+- CC1101 RF transceiver module (433 MHz recommended)
+- Proper wiring for SPI communication
+
+## Pin Configuration
+
+The CC1101 requires the following connections:
+- **SPI Bus**: CLK, MOSI, MISO pins
+- **CS**: Chip Select pin
+- **GDO0**: Data pin for transmission (remote_transmitter)
+- **GDO2**: Data pin for reception (remote_receiver)
+
+## Usage
+
+### 1. Include in Your ESPHome Configuration
 
 ```yaml
 packages:
-  generator_control:
-    url: https://github.com/yourusername/yambms-genfobber
-    file: yambms_genfobber.yaml
-    ref: main
-    # All settings are optional - defaults shown below
+  genfobber: !include
+    file: path/to/yambms_genfobber.yaml
     vars:
+      # CC1101 Configuration
+      cc1101_frequency: "433920000"  # 433.92 MHz in Hz
+
+      # SPI Pin Configuration
+      spi_clk_pin: "14"
+      spi_mosi_pin: "11"
+      spi_miso_pin: "13"
+
       # CC1101 Pin Configuration
-      sck_pin: "18"           # SPI Clock
-      miso_pin: "19"          # SPI MISO
-      mosi_pin: "23"          # SPI MOSI
-      csn_pin: "5"            # Chip Select
-      gdo0_pin: "2"           # CC1101 GDO0 Data I/O
-      dry_contact_pin: "15"   # Dry contact input
-      # RF Transmission Settings
-      tx_frequency: "433.89"  # TX frequency in MHz
-      # Generator RF Codes (replace with your captured codes)
-      generator_start_code: '[your, start, codes, here]'
-      generator_stop_code: '[your, stop, codes, here]'
+      cc1101_cs_pin: "21"
+      cc1101_gdo0_pin: "1"   # GDO0 for TX
+      cc1101_gdo2_pin: "42"  # GDO2 for RX
+
+      # Dry Contact Input Pin
+      dry_contact_pin: "38"
+      dry_contact_inverted: "true"
+
+      # Start/Stop Generator Transmission Codes (captured from your remote)
+      start_generator_code: "339, -1161, 1071, -413, ..."
+      stop_generator_code: "330, -1143, 1064, -419, ..."
 ```
 
-## Configuration Examples
+### 2. Capturing RF Codes from Your Remote
 
-### Minimal Configuration (using all defaults)
+1. Flash the firmware with the template included
+2. In Home Assistant, toggle the "CC1101 Listen Mode" switch ON
+3. Press your physical remote button
+4. Check the ESPHome logs for the captured raw codes
+5. Copy the raw code array and paste into your configuration as `start_generator_code` or `stop_generator_code`
+6. Recompile and flash
 
-```yaml
-packages:
-  generator_control:
-    url: https://github.com/yourusername/yambms-genfobber
-    file: yambms_genfobber.yaml
-    ref: main
+Example log output:
+```
+[remote.raw:028]: Received Raw: 339, -1161, 1071, -413, 1062, -423, ...
 ```
 
-### Custom Pin Configuration
+### 3. Testing Your Configuration
 
-```yaml
-packages:
-  generator_control:
-    url: https://github.com/yourusername/yambms-genfobber
-    file: yambms_genfobber.yaml
-    ref: main
-    vars:
-      sck_pin: "14"
-      miso_pin: "12"
-      mosi_pin: "13"
-      csn_pin: "15"
-      gdo0_pin: "4"
-      dry_contact_pin: "16"
-```
+Once configured:
+- Press the physical dry contact button to trigger transmission
+- Or use the Home Assistant buttons: "Transmit Button 1" and "Transmit Button 2"
+- Monitor the logs to verify transmission is occurring
 
-### Custom RF Codes and Frequency
+## Configuration Variables
 
-```yaml
-packages:
-  generator_control:
-    url: https://github.com/yourusername/yambms-genfobber
-    file: yambms_genfobber.yaml
-    ref: main
-    vars:
-      tx_frequency: "433.92"
-      generator_start_code: '[339, -1161, 1071, -413, 1062, -423, 321, ...]'
-      generator_stop_code: '[330, -1143, 1064, -419, 1075, -413, 337, ...]'
-```
+All variables with their default values:
 
-## Home Assistant Controls
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cc1101_frequency` | `"433920000"` | Frequency in Hz (433.92 MHz) |
+| `spi_clk_pin` | `"14"` | SPI Clock pin |
+| `spi_mosi_pin` | `"11"` | SPI MOSI pin |
+| `spi_miso_pin` | `"13"` | SPI MISO pin |
+| `cc1101_cs_pin` | `"21"` | CC1101 Chip Select |
+| `cc1101_gdo0_pin` | `"1"` | GDO0 for TX |
+| `cc1101_gdo2_pin` | `"42"` | GDO2 for RX |
+| `dry_contact_pin` | `"38"` | Dry contact input |
+| `dry_contact_inverted` | `"true"` | Invert dry contact logic |
+| `start_generator_code` | *(example)* | RF code to start generator |
+| `stop_generator_code` | *(example)* | RF code to stop generator |
+| `tx_repeat_times` | `"3"` | Times to repeat transmission |
+| `tx_repeat_wait` | `"15ms"` | Wait between repeats |
 
-Once added to your YamBMS system, you'll have access to:
+## Entities Created
 
-- **Generator RF Listen Mode** (switch): Enable to capture RF codes from your existing remote
-- **Generator Start** (button): Manually send the start command
-- **Generator Stop** (button): Manually send the stop command
+- **Switch**: "CC1101 Listen Mode" - Toggle RF receiver
+- **Binary Sensor**: "Dry Contact" - Status of physical button
+- **Button**: "Start Generator" - Manual trigger to start
+- **Button**: "Stop Generator" - Manual trigger to stop
 
-Both manual buttons automatically disable listen mode before transmitting.
+## Common Frequencies
 
-## Learning RF Codes
+- **433.92 MHz**: `"433920000"` (most common ISM band)
+- **315 MHz**: `"315000000"` (common in North America)
+- **868 MHz**: `"868000000"` (common in Europe)
+- **915 MHz**: `"915000000"` (common in North America)
 
-To capture your generator remote's RF codes:
+## Troubleshooting
 
-1. Enable the **"Generator RF Listen Mode"** switch in Home Assistant
-2. Monitor the ESPHome logs
-3. Press your generator remote's start button
-4. Copy the raw codes from the logs (look for `remote_receiver` output)
-5. Update the `generator_start_code` in the `vars:` section of your YAML with the captured codes
-6. Repeat for the stop button
-7. Disable listen mode when done
-8. Recompile and upload your firmware
+### "Pin X is used in multiple places"
+- GDO0 pin is intentionally shared between cc1101 and remote_transmitter
+- Ensure `allow_other_uses: true` is set on both components (already configured in template)
 
-Example of captured codes in logs:
-```
-[remote.raw:059]: Received Raw: [339, -1161, 1071, -413, 1062, ...]
-```
+### No transmission occurring
+- Check pin connections
+- Verify frequency matches your device (433.92 MHz most common)
+- Ensure antenna is connected to CC1101
+- Check logs for "Starting transmission" messages
 
-Copy the entire array including brackets and add to your vars:
-```yaml
-vars:
-  generator_start_code: '[339, -1161, 1071, -413, 1062, ...]'
-```
+### Can't capture codes
+- Enable "Listen Mode" switch
+- Ensure GDO2 pin is properly connected
+- Check that frequency matches your remote
+- Remote must be close to CC1101 antenna
 
-## Hardware Connections
+## Hardware Compatibility
 
-- **SCK**: SPI Clock (default: GPIO 18)
-- **MISO**: SPI Master In Slave Out (default: GPIO 19)
-- **MOSI**: SPI Master Out Slave In (default: GPIO 23)
-- **CSN**: Chip Select (default: GPIO 5)
-- **GDO0**: Data I/O (default: GPIO 2)
-- **Dry Contact**: Generator control input (default: GPIO 15)
+Tested with:
+- ESP32-S3 (LilyGo T-Connect)
+- CC1101 433MHz modules
+- Common garage door/gate RF remotes
 
-## Dry Contact Behavior
+## License
 
-- **Contact Closes**: Sends generator start command
-- **Contact Opens**: Sends generator stop command
+This template is provided as-is for use in ESPHome projects.
