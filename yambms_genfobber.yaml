@@ -39,14 +39,18 @@ spi:
 cc1101:
   spi_id: cc1101_spi_bus
   cs_pin: ${cc1101_cs_pin}
-  gdo0_pin: ${cc1101_gdo0_pin}
-  gdo2_pin: ${cc1101_gdo2_pin}
+  gdo0_pin:
+    number: ${cc1101_gdo0_pin}
+    allow_other_uses: true
+  frequency: ${cc1101_frequency}
 
 
-# Remote Transmitter (uses GDO0)
+# Remote Transmitter (uses GDO0 - same pin as CC1101)
 
 remote_transmitter:
-  pin: ${cc1101_gdo0_pin}
+  pin:
+    number: ${cc1101_gdo0_pin}
+    allow_other_uses: true
   carrier_duty_percent: 100%
   non_blocking: true
   on_transmit:
