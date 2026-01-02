@@ -1,192 +1,124 @@
-# CC1101 Fobber Component - YamBMS Remote Package Module
-# This module sends RF commands to control a generator via CC1101 transceiver
-# Include this file in your main ESPHome configuration
-# Override pins and RF codes using vars: when including this package
+# CC1101 Fobber Template - Include this file and override substitutions
+# This template includes all the CC1101 functionality with configurable pins and button codes
 
-# Configuration defaults - override via vars: in parent file
 substitutions:
+
+  # SPI Pin Configuration (LilyGo T-Connect header pins)
+  spi_clk_pin: "14"    # IO14 - Safe
+  spi_mosi_pin: "11"   # IO11 - Safe
+  spi_miso_pin: "13"   # IO13 - Safe (avoiding IO48 strapping pin)
+
   # CC1101 Pin Configuration
-  sck_pin: "18"           # SPI Clock
-  miso_pin: "19"          # SPI MISO
-  mosi_pin: "23"          # SPI MOSI
-  csn_pin: "5"            # Chip Select
-  gdo0_pin: "2"           # CC1101 GDO0 Data I/O
-  dry_contact_pin: "15"   # Dry contact input
-  # RF Transmission Settings
-  tx_frequency: "433.89"  # TX frequency in MHz
-  # Generator control RF codes - replace with your captured codes
-  generator_start_code: '[339, -1161, 1071, -413, 1062, -423, 321, -1159, 330, -1144, 1064, -419, 324, -1171, 1064, -419, 1073, -413, 1062, -422, 319, -1163, 1055, -414, 1085, -419, 1068, -409, 336, -1145, 323, -1161, 1074, -413, 338, -1146, 319, -1165, 329, -1145, 337, -1158, 318, -1166, 335, -1146, 1073, -422, 327]'
-  generator_stop_code: '[330, -1143, 1064, -419, 1075, -413, 337, -1150, 319, -1163, 1056, -433, 312, -1178, 1069, -408, 1061, -414, 1080, -417, 321, -1151, 1065, -421, 1067, -404, 1085, -406, 340, -1158, 321, -1150, 1061, -421, 319, -1165, 330, -1170, 302, -1182, 321, -1151, 334, -1146, 1067, -432, 334, -1146, 324]'
+  cc1101_cs_pin: "21"   # IO21 - Safe
+  cc1101_gdo0_pin: "1"  # IO1 - GDO0 for TX
+  cc1101_gdo2_pin: "42" # IO42 - GDO2 for RX
 
-# Required includes and libraries
-# IMPORTANT: When using this as a remote package from GitHub, you must also
-# download cc1101.h from the same repo and place it in your ESPHome project directory.
-# Download from: https://github.com/andrewfraley/yambms-genfobber/raw/main/cc1101.h
-esphome:
-  includes:
-    - cc1101.h
-  libraries:
-    - SPI
-    - "SmartRC-CC1101-Driver-Lib"
-  on_boot:
-    priority: 600  # Run early, before most other components
-    then:
-      - lambda: |-
-          // Create and register CC1101 transceiver
-          auto *cc1101 = new CC1101(
-            ${sck_pin},   // SCK
-            ${miso_pin},  // MISO
-            ${mosi_pin},  // MOSI
-            ${csn_pin},   // CSN
-            ${gdo0_pin},  // GDO0
-            200,  // bandwidth_khz
-            ${tx_frequency}, // frequency_mhz
-            id(transmitter)
-          );
-          App.register_component(cc1101);
-          id(cc1101_transceiver) = cc1101;
+  # Dry Contact Input Pin
+  dry_contact_pin: "38"  # IO38 - Safe
+  dry_contact_inverted: "true"  # Set to false if button logic is inverted
 
-            200,  // bandwidth_khz
-            ${tx_frequency}, // frequency_mhz
-            id(transmitter)
-          );
-          App.register_component(cc1101);
-          id(cc1101_transceiver) = cc1101;
+  # Button 1 Transmission Code (raw format)
+  button1_code: "339, -1161, 1071, -413, 1062, -423, 321, -1159, 330, -1144, 1064, -419, 324, -1171, 1064, -419, 1073, -413, 1062, -422, 319, -1163, 1055, -414, 1085, -419, 1068, -409, 336, -1145, 323, -1161, 1074, -413, 338, -1146, 319, -1165, 329, -1145, 337, -1158, 318, -1166, 335, -1146, 1073, -422, 327"
+
+  # Button 2 Transmission Code (raw format)
+  button2_code: "330, -1143, 1064, -419, 1075, -413, 337, -1150, 319, -1163, 1056, -433, 312, -1178, 1069, -408, 1061, -414, 1080, -417, 321, -1151, 1065, -421, 1067, -404, 1085, -406, 340, -1158, 321, -1150, 1061, -421, 319, -1165, 330, -1170, 302, -1182, 321, -1151, 334, -1146, 1067, -432, 334, -1146, 324"
+
+  # Transmission Settings
+  tx_repeat_times: "3"
+  tx_repeat_wait: "15ms"
 
 
+# SPI Bus Configuration
+spi:
+  - id: cc1101_spi_bus
+    clk_pin: ${spi_clk_pin}
+    mosi_pin: ${spi_mosi_pin}
+    miso_pin: ${spi_miso_pin}
 
-# Internal globals for RF codes (populated from substitutions)
-globals:
-  - id: generator_start_code
-    type: std::vector<int>
-    initial_value: '${generator_start_code}'
-  - id: generator_stop_code
-    type: std::vector<int>
-    initial_value: '${generator_stop_code}'
-  - id: cc1101_transceiver
-    type: CC1101*
-    initial_value: 'nullptr'
-    restore_value: no
+# CC1101 Configuration
+cc1101:
+  spi_id: cc1101_spi_bus
+  cs_pin: ${cc1101_cs_pin}
+  gdo0_pin: ${cc1101_gdo0_pin}
+  gdo2_pin: ${cc1101_gdo2_pin}
 
+
+# Remote Transmitter (uses GDO0)
 
 remote_transmitter:
-  - id: transmitter
-    pin:
-      number: ${gdo0_pin}
-      allow_other_uses: true
-    carrier_duty_percent: 100%
+  pin: ${cc1101_gdo0_pin}
+  carrier_duty_percent: 100%
+  non_blocking: true
+  on_transmit:
+    then:
+      - cc1101.begin_tx
+  on_complete:
+    then:
+      - cc1101.begin_rx
 
+# Remote Receiver (uses GDO2)
 remote_receiver:
-  - id: receiver
-    pin:
-      number: ${gdo0_pin}
-      allow_other_uses: true
-    dump:
-      - raw
+  pin: ${cc1101_gdo2_pin}
+  dump:
+    - raw
 
-# TX frequency configuration
-number:
-  - platform: template
-    id: tx_frequency_number
-    internal: true
-    unit_of_measurement: "MHz"
-    min_value: 430.000
-    max_value: 440.000
-    step: 0.001
-    optimistic: true
-    initial_value: ${tx_frequency}
-    on_value:
-      - lambda: |-
-          if (id(cc1101_transceiver) != nullptr) {
-            get_cc1101(cc1101_transceiver).setFreq(x);
-          }
-
-# Reusable transmission scripts
-script:
-  - id: transmit_generator_start
-    mode: single
-    then:
-      - switch.turn_off: receive_mode
-      - lambda: |-
-          if (id(cc1101_transceiver) != nullptr) {
-            get_cc1101(cc1101_transceiver).setFreq(id(tx_frequency_number).state);
-            get_cc1101(cc1101_transceiver).beginTransmission();
-          }
-      - remote_transmitter.transmit_raw:
-          code: !lambda "return id(generator_start_code);"
-          repeat:
-            times: 3
-            wait_time: 15ms
-
-  - id: transmit_generator_stop
-    mode: single
-    then:
-      - switch.turn_off: receive_mode
-      - lambda: |-
-          if (id(cc1101_transceiver) != nullptr) {
-            get_cc1101(cc1101_transceiver).setFreq(id(tx_frequency_number).state);
-            get_cc1101(cc1101_transceiver).beginTransmission();
-          }
-      - remote_transmitter.transmit_raw:
-          code: !lambda "return id(generator_stop_code);"
-          repeat:
-            times: 3
-            wait_time: 15ms
-
-# Listen mode toggle - exposed to Home Assistant
+# Listen mode toggle
 switch:
   - platform: template
-    name: "Generator RF Listen Mode"
-    id: receive_mode
-    icon: mdi:radio-tower
+    name: "CC1101 Listen Mode"
+    id: listen_mode
     optimistic: true
+    restore_mode: ALWAYS_OFF
     turn_on_action:
-      - lambda: |-
-          if (id(cc1101_transceiver) != nullptr) {
-            get_cc1101(cc1101_transceiver).endTransmission();
-          }
+      - cc1101.begin_rx
     turn_off_action:
-      - lambda: |-
-          // Ensure correct TX frequency
-          if (id(cc1101_transceiver) != nullptr) {
-            get_cc1101(cc1101_transceiver).setFreq(id(tx_frequency_number).state);
-          }
-      - lambda: |-
-          if (id(cc1101_transceiver) != nullptr) {
-            get_cc1101(cc1101_transceiver).beginTransmission();
-          }
+      - cc1101.set_idle
 
-# Dry contact input for generator control
-# When contact closes: send generator start command
-# When contact opens: send generator stop command
+# Dry contact input for CC1101 transmission
 binary_sensor:
   - platform: gpio
-    id: generator_control_contact
-    internal: true
+    name: "${friendly_name} Dry Contact"
+    id: physical_button
     pin:
       number: ${dry_contact_pin}
-      mode: INPUT_PULLUP
-      inverted: true
+      mode: INPUT
+      inverted: ${dry_contact_inverted}
     filters:
       - delayed_on: 50ms
       - delayed_off: 50ms
     on_press:
-      - script.execute: transmit_generator_start
+      - logger.log: "Physical button pressed - triggering button 1"
+      - button.press: cc1101_transmit_button_1
     on_release:
-      - script.execute: transmit_generator_stop
+      - logger.log: "Physical button released - triggering button 2"
+      - button.press: cc1101_transmit_button_2
 
-# Manual control buttons - exposed to Home Assistant
+# Transmit buttons
 button:
   - platform: template
-    name: "Generator Start"
-    id: manual_generator_start
-    icon: mdi:play-circle-outline
+    name: "${friendly_name} Transmit Button 1"
+    id: cc1101_transmit_button_1
+    icon: mdi:alpha-1-circle-outline
     on_press:
-      - script.execute: transmit_generator_start
+      - logger.log: "Button 1: Starting transmission"
+      - remote_transmitter.transmit_raw:
+          code: !lambda |-
+            return {${button1_code}};
+          repeat:
+            times: ${tx_repeat_times}
+            wait_time: ${tx_repeat_wait}
+      - logger.log: "Button 1: Transmission complete"
 
   - platform: template
-    name: "Generator Stop"
-    id: manual_generator_stop
-    icon: mdi:stop-circle-outline
+    name: "${friendly_name} Transmit Button 2"
+    id: cc1101_transmit_button_2
+    icon: mdi:alpha-2-circle-outline
     on_press:
-      - script.execute: transmit_generator_stop
+      - logger.log: "Button 2: Starting transmission"
+      - remote_transmitter.transmit_raw:
+          code: !lambda |-
+            return {${button2_code}};
+          repeat:
+            times: ${tx_repeat_times}
+            wait_time: ${tx_repeat_wait}
+      - logger.log: "Button 2: Transmission complete"
