@@ -14,6 +14,7 @@ substitutions:
   # CC1101 Pin Configuration
   cc1101_cs_pin: "99"   # AKA CSN
   cc1101_gdo0_pin: "99"
+  cc1101_gdo2_pin: "99"
 
   # Dry Contact Input Pin
   dry_contact_pin: "99"  # IO38 - Safe
@@ -94,7 +95,9 @@ binary_sensor:
     id: physical_button
     pin:
       number: ${dry_contact_pin}
-      mode: INPUT
+      mode:
+        input: true
+        pullup: true
       inverted: ${dry_contact_inverted}
     filters:
       - delayed_on: 50ms
