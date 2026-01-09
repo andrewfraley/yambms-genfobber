@@ -66,27 +66,26 @@ remote_transmitter:
   on_complete:
     then:
       - logger.log: "Transmission complete"
-      - cc1101.begin_rx
+      - cc1101.set_idle
 
 # Remote Receiver (single-pin wiring: GDO0 for RX)
-# remote_receiver:
-#   pin:
-#     number: ${cc1101_gdo0_pin}
-#     allow_other_uses: true
-#   dump:
-#     - raw
+remote_receiver:
+  pin:
+    number: ${cc1101_gdo2_pin}
+  dump:
+    - raw
 
 # Listen mode toggle
-# switch:
-#   - platform: template
-#     name: "CC1101 Listen Mode"
-#     id: listen_mode
-#     optimistic: true
-#     restore_mode: ALWAYS_OFF
-#     turn_on_action:
-#       - cc1101.begin_rx
-#     turn_off_action:
-#       - cc1101.set_idle
+switch:
+  - platform: template
+    name: "CC1101 Listen Mode"
+    id: listen_mode
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - cc1101.begin_rx
+    turn_off_action:
+      - cc1101.set_idle
 
 # Dry contact input for CC1101 transmission
 binary_sensor:
